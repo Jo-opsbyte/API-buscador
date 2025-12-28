@@ -22,13 +22,11 @@ def analizar_pregunta(texto):
     texto_lower = texto.lower()
     resultado = {"intencion": None, "plataformas": [], "query": texto}
 
-    # Detectar plataformas
     if "facebook" in texto_lower:
         resultado["plataformas"].append("facebook")
     if "instagram" in texto_lower:
         resultado["plataformas"].append("instagram")
 
-    # Detectar intención
     if any(x in texto_lower for x in ["escuela", "cbtis", "secundaria", "instituto"]):
         resultado["intencion"] = "institucion"
     elif any(x in texto_lower for x in ["persona", "nombre", "juan", "maria"]):
@@ -36,11 +34,9 @@ def analizar_pregunta(texto):
     else:
         resultado["intencion"] = "general"
 
-    # Si no se menciona plataforma, buscar en todas
     if not resultado["plataformas"]:
         resultado["plataformas"] = ["facebook", "instagram"]
 
-    # Asegurar que query nunca quede vacía
     if not resultado["query"]:
         resultado["query"] = texto
 
@@ -78,11 +74,7 @@ def buscar_wikipedia(query):
         wiki_url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={query}&format=json"
         r = requests.get(wiki_url, headers=HEADERS, timeout=10).json()
         for item in r.get("query", {}).get("search", []):
-            resultados.append({
-                "titulo": item["title"],
-                "snippet": item["snippet"],
-                "link": f"https://en.wikipedia.org/wiki/{item['title'].replace(' ', '_')}"
-            })
+            resultados.append(f"[Wikipedia] https://en.wikipedia.org/wiki/{item['title'].replace(' ', '_')}")
     except:
         pass
     return resultados
@@ -100,14 +92,23 @@ def buscar_google_cse(query):
         url = f"https://www.googleapis.com/customsearch/v1?key={API_KEY}&cx={CX}&q={query}"
         r = requests.get(url, headers=HEADERS, timeout=10).json()
         for item in r.get("items", []):
-            resultados.append({
-                "titulo": item.get("title"),
-                "snippet": item.get("snippet"),
-                "link": item.get("link")
-            })
+            resultados.append(f"[Google] {item.get('link')}")
     except:
         pass
     return resultados
+
+# -----------------------------
+# Formatear todos los resultados en una sola lista
+# -----------------------------
+def formatear_todos(perfiles, wiki, google):
+    resultados_formateados = []
+    for fb in perfiles.get("facebook", []):
+        resultados_formateados.append(f"[Facebook] {fb}")
+    for ig in perfiles.get("instagram", []):
+        resultados_formateados.append(f"[Instagram] {ig}")
+    resultados_formateados.extend(wiki)
+    resultados_formateados.extend(google)
+    return resultados_formateados
 
 # -----------------------------
 # Rutas API
@@ -127,12 +128,12 @@ def buscar():
     wiki = buscar_wikipedia(analisis["query"])
     google = buscar_google_cse(analisis["query"])
 
+    resultados_formateados = formatear_todos(perfiles, wiki, google)
+
     return jsonify({
         "pregunta": texto,
         "analisis": analisis,
-        "resultados": perfiles,
-        "wikipedia": wiki,
-        "google_cse": google
+        "resultados": resultados_formateados
     })
 
 if __name__ == "__main__":
